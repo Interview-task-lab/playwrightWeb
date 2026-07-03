@@ -1,39 +1,42 @@
 /**
  * Recorder Service
  *
- * Manages the lifecycle of a `npx playwright codegen` child process.
- * Encapsulates all mutable recording state behind a clean API.
- * Follows Single Responsibility Principle — only recording concerns live here.
+ * Manages per-user `npx playwright codegen` child processes to prevent conflicts.
+ * Follows the Session Manager pattern.
  */
 
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { v4: uuidv4 } = require('uuid');
 const config = require('../config/app.config');
 const codeParser = require('./codeParser.service');
 
 class RecorderService {
   constructor() {
-    this._reset();
+    this._sessions = new Map(); // userId -> session object
   }
 
   // ─── Public API ────────────────────────────────────────────────────────────
 
   /**
-   * Returns whether a recording session is currently active.
+   * Returns whether a user has an active recording session.
+   * @param {number} userId
    * @returns {boolean}
    */
-  get isActive() {
-    return this._activeProcess !== null;
+  isActive(userId) {
+    const session = this._sessions.get(userId);
+    return session ? session.activeProcess !== null : false;
   }
 
   /**
-   * Starts a new codegen recording session.
+   * Starts a new codegen recording session for a user.
+   * @param {number} userId
    * @param {{ url?: string, language?: string }} options
    * @returns {{ success: boolean, message: string }}
    */
-  start({ url, language } = {}) {
-    if (this._activeProcess) {
+  start(userId, { url } = {}) {
+    if (this.isActive(userId)) {
       return {
         success: false,
         message: 'A recording session is already active. Close the Playwright browser window first.',
@@ -41,59 +44,69 @@ class RecorderService {
     }
 
     const targetUrl = url || config.recording.defaultUrl;
-    const targetLang = language || config.recording.defaultLanguage;
-
-    this._lastUrl = targetUrl;
-    this._lastLanguage = targetLang;
-    this._exited = false;
-    this._exitCode = null;
-    this._error = null;
-
-    // Clean up previous output file
-    if (fs.existsSync(config.paths.outputFile)) {
-      fs.unlinkSync(config.paths.outputFile);
-    }
+    const targetLang = 'javascript';
+    const sessionUuid = uuidv4();
+    const outputFile = path.join(config.paths.temp, `raw_script_${userId}_${sessionUuid}.js`);
 
     this._ensureTempDir();
+
+    // Clean up any old output file if it exists
+    if (fs.existsSync(outputFile)) {
+      fs.unlinkSync(outputFile);
+    }
 
     const args = [
       'playwright', 'codegen', targetUrl,
       `--target=${targetLang}`,
-      `--output=${config.paths.outputFile}`,
+      `--output=${outputFile}`,
     ];
 
-    console.log(`🎬 Starting recording: npx ${args.join(' ')}`);
+    console.log(`🎬 [User #${userId}] Starting recording: npx ${args.join(' ')}`);
 
-    this._activeProcess = spawn('npx', args, {
+    const activeProcess = spawn('npx', args, {
       cwd: config.paths.root,
       stdio: 'pipe',
       shell: true,
     });
 
-    this._activeProcess.stdout.on('data', (d) =>
-      console.log(`[codegen stdout] ${d.toString().trim()}`)
+    const session = {
+      activeProcess,
+      exited: false,
+      exitCode: null,
+      error: null,
+      lastUrl: targetUrl,
+      lastLanguage: targetLang,
+      outputFile,
+      killTimeout: null
+    };
+
+    this._sessions.set(userId, session);
+
+    activeProcess.stdout.on('data', (d) =>
+      console.log(`[User #${userId} codegen stdout] ${d.toString().trim()}`)
     );
-    this._activeProcess.stderr.on('data', (d) =>
-      console.log(`[codegen stderr] ${d.toString().trim()}`)
+    activeProcess.stderr.on('data', (d) =>
+      console.log(`[User #${userId} codegen stderr] ${d.toString().trim()}`)
     );
-    this._activeProcess.on('error', (err) => {
-      console.error('❌ Failed to start codegen process:', err.message);
-      this._error = err.message;
-      this._exited = true;
-      this._cleanup();
+    activeProcess.on('error', (err) => {
+      console.error(`❌ [User #${userId}] Failed to start codegen process:`, err.message);
+      session.error = err.message;
+      session.exited = true;
+      this._cleanup(userId);
     });
-    this._activeProcess.on('close', (code) => {
-      console.log(`🛑 Codegen process exited with code ${code}`);
-      this._exitCode = code;
-      this._exited = true;
-      this._cleanup();
+    activeProcess.on('close', (code) => {
+      console.log(`🛑 [User #${userId}] Codegen process exited with code ${code}`);
+      session.exitCode = code;
+      session.exited = true;
+      this._cleanup(userId);
     });
 
     // Safety timeout
-    this._killTimeout = setTimeout(() => {
-      if (this._activeProcess) {
-        console.log('⏰ 10-minute timeout reached. Killing codegen process.');
-        this._activeProcess.kill('SIGTERM');
+    session.killTimeout = setTimeout(() => {
+      const activeSession = this._sessions.get(userId);
+      if (activeSession && activeSession.activeProcess) {
+        console.log(`⏰ [User #${userId}] Timeout reached. Killing codegen process.`);
+        activeSession.activeProcess.kill('SIGTERM');
       }
     }, config.recording.maxExecutionMs);
 
@@ -104,30 +117,41 @@ class RecorderService {
   }
 
   /**
-   * Returns the current recording status and result data when complete.
+   * Returns the recording status for a user.
+   * @param {number} userId
    * @returns {{ status: string, message: string, data?: object }}
    */
-  getStatus() {
-    if (this._activeProcess && !this._exited) {
+  getStatus(userId) {
+    const session = this._sessions.get(userId);
+
+    if (!session) {
+      return { status: 'idle', message: 'No active recording session.' };
+    }
+
+    if (session.activeProcess && !session.exited) {
       return {
         status: 'recording',
         message: 'Browser is still open. Execute your test actions, then close the browser window.',
       };
     }
 
-    if (this._exited) {
-      if (this._error) {
-        const msg = this._error;
-        this._exited = false;
-        this._error = null;
-        return { status: 'error', message: `Recording failed: ${msg}` };
+    if (session.exited) {
+      // Keep reference to values we need, then clear the session
+      const { error, outputFile, lastUrl, lastLanguage } = session;
+      this._sessions.delete(userId);
+
+      if (error) {
+        return { status: 'error', message: `Recording failed: ${error}` };
       }
 
-      if (fs.existsSync(config.paths.outputFile)) {
+      if (fs.existsSync(outputFile)) {
         try {
-          let code = fs.readFileSync(config.paths.outputFile, 'utf-8');
+          let code = fs.readFileSync(outputFile, 'utf-8');
           code = codeParser.uncommentAssertions(code);
-          const steps = codeParser.parseCodeToSteps(code, this._lastLanguage);
+          const steps = codeParser.parseCodeToSteps(code, lastLanguage);
+
+          // Clean up the temp file
+          try { fs.unlinkSync(outputFile); } catch (_) {}
 
           return {
             status: 'completed',
@@ -135,8 +159,8 @@ class RecorderService {
             data: {
               code,
               steps,
-              url: this._lastUrl,
-              language: this._lastLanguage,
+              url: lastUrl,
+              platform: 'web',
             },
           };
         } catch (err) {
@@ -150,8 +174,8 @@ class RecorderService {
         data: {
           code: '// No actions were recorded.',
           steps: [],
-          url: this._lastUrl,
-          language: this._lastLanguage,
+          url: lastUrl,
+          platform: 'web',
         },
       };
     }
@@ -161,22 +185,15 @@ class RecorderService {
 
   // ─── Private ───────────────────────────────────────────────────────────────
 
-  _reset() {
-    this._activeProcess = null;
-    this._exited = false;
-    this._exitCode = null;
-    this._error = null;
-    this._lastUrl = '';
-    this._lastLanguage = '';
-    this._killTimeout = null;
-  }
-
-  _cleanup() {
-    if (this._killTimeout) {
-      clearTimeout(this._killTimeout);
-      this._killTimeout = null;
+  _cleanup(userId) {
+    const session = this._sessions.get(userId);
+    if (session) {
+      if (session.killTimeout) {
+        clearTimeout(session.killTimeout);
+        session.killTimeout = null;
+      }
+      session.activeProcess = null;
     }
-    this._activeProcess = null;
   }
 
   _ensureTempDir() {

@@ -36,6 +36,11 @@ const config = {
     defaultUrl: 'https://www.enuygun.com/',
     defaultLanguage: 'javascript',
   },
+
+  auth: {
+    jwtSecret: process.env.JWT_SECRET || 'playwright-studio-dev-secret-key',
+    jwtExpiresIn: process.env.JWT_EXPIRES_IN || '8h',
+  },
 };
 
 module.exports = config;

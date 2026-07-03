@@ -12,7 +12,8 @@ const fs = require('fs');
 
 async function runTestCase(req, res, next) {
   try {
-    if (runnerService.isBusy) {
+    const userId = req.user.userId;
+    if (runnerService.isBusy(userId)) {
       return res.status(409).json({
         success: false,
         message: 'A test is already running. Please wait for it to finish.',
@@ -31,7 +32,7 @@ async function runTestCase(req, res, next) {
       } catch (_) { /* use default */ }
     }
 
-    const result = runnerService.run(testCase, baseUrl);
+    const result = runnerService.run(userId, testCase, baseUrl);
 
     if (!result.success) {
       return res.status(400).json(result);
@@ -45,7 +46,8 @@ async function runTestCase(req, res, next) {
 
 function getRunStatus(req, res, next) {
   try {
-    const status = runnerService.getStatus();
+    const userId = req.user.userId;
+    const status = runnerService.getStatus(userId);
     return res.json(status);
   } catch (err) {
     return next(err);

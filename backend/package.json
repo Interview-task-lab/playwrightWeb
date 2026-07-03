@@ -9,12 +9,16 @@
     "dev": "node --watch server.js",
     "db:up": "docker-compose up -d",
     "db:down": "docker-compose down",
+    "db:seed": "node src/config/seed.js",
     "playwright:install": "npx playwright install"
   },
   "dependencies": {
+    "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "express": "^4.19.2",
-    "pg": "^8.12.0"
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.12.0",
+    "uuid": "^14.0.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",

@@ -10,14 +10,25 @@
 export class MainPage {
   constructor() {
     // ─── Controls ──────────────────────────────────────────────────────────
+    this.controlsSection   = document.getElementById('controlsSection');
     this.urlInput          = document.getElementById('urlInput');
     this.languageSelect    = document.getElementById('languageSelect');
     this.startBtn          = document.getElementById('startBtn');
     this.configUrlDisplay  = document.getElementById('configUrlDisplay');
 
+    // ─── User Profile ──────────────────────────────────────────────────────
+    this.headerUsername    = document.getElementById('headerUsername');
+    this.headerUserRole    = document.getElementById('headerUserRole');
+    this.logoutBtn         = document.getElementById('logoutBtn');
+
     // ─── Sections ──────────────────────────────────────────────────────────
     this.recordingBanner   = document.getElementById('recordingBanner');
     this.resultsSection    = document.getElementById('resultsSection');
+
+    // ─── Views & Navigation ────────────────────────────────────────────────
+    this.domainList        = document.getElementById('domainList');
+    this.welcomeView       = document.getElementById('welcomeView');
+    this.studioView        = document.getElementById('studioView');
 
     // ─── Results ───────────────────────────────────────────────────────────
     this.stepsContainer    = document.getElementById('stepsContainer');
@@ -45,6 +56,24 @@ export class MainPage {
   }
 
   // ─── Convenience methods ─────────────────────────────────────────────────
+
+  showStudio() {
+    this.welcomeView.classList.add('hidden');
+    this.studioView.classList.remove('hidden');
+  }
+
+  showWelcome() {
+    this.studioView.classList.add('hidden');
+    this.welcomeView.classList.remove('hidden');
+  }
+
+  setRecordingAllowed(allowed) {
+    if (allowed) {
+      this.controlsSection.classList.remove('hidden');
+    } else {
+      this.controlsSection.classList.add('hidden');
+    }
+  }
 
   showRecordingBanner()  { this.recordingBanner.classList.remove('hidden'); }
   hideRecordingBanner()  { this.recordingBanner.classList.add('hidden'); }
@@ -127,7 +156,7 @@ export class MainPage {
   }
 
   get selectedUrl()      { return this.urlInput?.value?.trim() ?? ''; }
-  get selectedLanguage() { return this.languageSelect.value; }
+  get selectedLanguage() { return 'javascript'; }
   get testName()         { return this.testNameInput.value.trim(); }
   set testName(v)        { this.testNameInput.value = v; }
   set configUrl(url)     {
