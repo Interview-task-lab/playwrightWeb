@@ -9,6 +9,8 @@
  * import this and never call fetch() directly.
  */
 
+import { authService } from './auth.service.js';
+
 const API_BASE = 'http://localhost:3000/api';
 
 /**
@@ -18,10 +20,25 @@ const API_BASE = 'http://localhost:3000/api';
  * @returns {Promise<any>}
  */
 async function request(endpoint, options = {}) {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers
+  };
+
+  const token = authService.getToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${API_BASE}${endpoint}`, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers,
     ...options,
   });
+
+  if (response.status === 401) {
+    authService.logout();
+    throw new Error('Session expired. Redirecting to login...');
+  }
 
   const data = await response.json();
 
@@ -41,13 +58,19 @@ export const configApi = {
   get: () => request('/config'),
 };
 
+// ─── Domains ──────────────────────────────────────────────────────────────────
+
+export const domainApi = {
+  getAll: () => request('/domains'),
+};
+
 // ─── Recording ────────────────────────────────────────────────────────────────
 
 export const recordApi = {
-  start: ({ url, language }) =>
+  start: ({ url }) =>
     request('/record/start', {
       method: 'POST',
-      body: JSON.stringify({ url, language }),
+      body: JSON.stringify({ url }),
     }),
 
   getStatus: () => request('/record/status'),
@@ -62,7 +85,10 @@ export const testCaseApi = {
       body: JSON.stringify(payload),
     }),
 
-  getAll: () => request('/test-cases'),
+  getAll: (domainId = null) => {
+    const query = domainId !== null ? `?domainId=${domainId}` : '';
+    return request(`/test-cases${query}`);
+  },
 
   delete: (id) =>
     request(`/test-cases/${id}`, { method: 'DELETE' }),

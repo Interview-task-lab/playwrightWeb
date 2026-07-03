@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Playwright Codegen Studio - Login" />
+  <title>Login - Playwright Codegen Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+          colors: {
+            surface: {
+              50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1',
+              400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334155',
+              800: '#1e293b', 850: '#172033', 900: '#0f172a', 950: '#020617',
+            },
+            accent: { 400: '#a78bfa', 500: '#8b5cf6', 600: '#7c3aed' },
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    .glass-card {
+      background: rgba(30, 41, 59, 0.4);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+    .input-field {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(51, 65, 85, 0.7);
+      color: #f8fafc;
+      padding: 0.75rem 1rem;
+      border-radius: 0.75rem;
+      transition: all 0.2s ease;
+    }
+    .input-field:focus {
+      outline: none;
+      border-color: #8b5cf6;
+      box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+      color: #ffffff;
+      font-weight: 600;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.75rem;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
+    }
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(139, 92, 246, 0.3);
+    }
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body class="bg-surface-950 text-surface-100 font-sans min-h-screen flex items-center justify-center p-6">
+
+  <div class="w-full max-w-md">
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-accent-500 to-accent-600 flex items-center justify-center shadow-lg shadow-accent-500/25 mx-auto mb-4">
+        <span class="text-3xl">🎭</span>
+      </div>
+      <h1 class="text-2xl font-bold tracking-tight text-white">Welcome back</h1>
+      <p class="text-sm text-surface-400 mt-2">Sign in to Playwright Codegen Studio</p>
+    </div>
+
+    <!-- Login Card -->
+    <div class="glass-card rounded-2xl p-8">
+      <form id="loginForm" class="space-y-6">
+        <div>
+          <label for="username" class="block text-xs font-semibold uppercase tracking-wider text-surface-400 mb-2">Username</label>
+          <input type="text" id="username" required placeholder="e.g. admin" class="input-field w-full text-sm" autocomplete="username" />
+        </div>
+        <div>
+          <label for="password" class="block text-xs font-semibold uppercase tracking-wider text-surface-400 mb-2">Password</label>
+          <input type="password" id="password" required placeholder="••••••••" class="input-field w-full text-sm" autocomplete="current-password" />
+        </div>
+        
+        <div id="errorMessage" class="text-red-400 text-xs font-medium hidden"></div>
+
+        <button type="submit" id="submitBtn" class="btn-primary w-full text-sm">
+          Sign In
+        </button>
+      </form>
+    </div>
+
+    <!-- Info Footer -->
+    <div class="text-center mt-6 text-xs text-surface-500">
+      <p>Use seeded accounts (e.g. <code class="text-surface-400 font-mono">admin</code> / <code class="text-surface-400 font-mono">123456</code>)</p>
+    </div>
+  </div>
+
+  <script type="module">
+    import { authService } from './src/services/auth.service.js';
+
+    // Guard: Redirect to app if already authenticated
+    if (authService.isAuthenticated()) {
+      window.location.href = 'index.html';
+    }
+
+    const loginForm = document.getElementById('loginForm');
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    const errorMessage = document.getElementById('errorMessage');
+    const submitBtn = document.getElementById('submitBtn');
+
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      errorMessage.classList.add('hidden');
+      errorMessage.textContent = '';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Signing in...';
+
+      const username = usernameInput.value;
+      const password = passwordInput.value;
+
+      try {
+        await authService.login(username, password);
+        window.location.href = 'index.html';
+      } catch (err) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Sign In';
+        errorMessage.textContent = err.message || 'Login failed. Please check your credentials.';
+        errorMessage.classList.remove('hidden');
+      }
+    });
+  </script>
+</body>
+</html>

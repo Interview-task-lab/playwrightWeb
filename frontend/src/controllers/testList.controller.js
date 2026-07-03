@@ -23,13 +23,15 @@ export class TestListController {
     this._getResult = getRecordingResult;
     /** @type {object[]} Local cache of test cases */
     this._testCases = [];
+    this._currentDomainId = null;
   }
 
-  // ─── Public ───────────────────────────────────────────────────────────────
+  // ─── Public API ───────────────────────────────────────────────────────────
 
-  async load() {
+  async load(domainId = null) {
+    this._currentDomainId = domainId;
     try {
-      const data = await testCaseApi.getAll();
+      const data = await testCaseApi.getAll(domainId);
 
       if (!data.success || !data.testCases?.length) {
         this._renderEmpty();
@@ -65,15 +67,16 @@ export class TestListController {
       const data = await testCaseApi.create({
         name,
         url: result.url,
-        language: result.language,
+        platform: result.platform || 'web',
         code: result.code,
         steps: result.steps,
+        domainId: this._currentDomainId
       });
 
       if (data.success) {
         this._toast.show(`Test "${name}" saved!`, 'success');
         this._page.testName = '';
-        await this.load();
+        await this.load(this._currentDomainId);
       } else {
         this._toast.show(data.message || 'Failed to save test.', 'error');
       }
@@ -90,7 +93,7 @@ export class TestListController {
     try {
       await testCaseApi.delete(id);
       this._toast.show(`Test "${name}" deleted.`, 'info');
-      await this.load();
+      await this.load(this._currentDomainId);
     } catch (err) {
       this._toast.show(`Failed to delete: ${err.message}`, 'error');
     }

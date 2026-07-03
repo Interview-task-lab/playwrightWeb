@@ -7,10 +7,33 @@
  */
 
 const testCaseService = require('../services/testCase.service');
+const domainRepository = require('../repositories/domain.repository');
 
 async function createTestCase(req, res, next) {
   try {
-    const testCase = await testCaseService.create(req.body);
+    let domainId = req.body.domainId ? parseInt(req.body.domainId, 10) : null;
+
+    // Validate that team members can only save to their domain or sub-domains
+    if (req.user.role !== 'admin' && req.user.role !== 'qa') {
+      if (!domainId) {
+        domainId = req.user.domainId;
+      } else {
+        const isAllowed = await domainRepository.isDescendantOrSelf(req.user.domainId, domainId);
+        if (!isAllowed) {
+          return res.status(403).json({
+            success: false,
+            message: 'Forbidden: You cannot save test cases outside your domain hierarchy.',
+          });
+        }
+      }
+    }
+
+    const testCase = await testCaseService.create({
+      ...req.body,
+      platform: req.body.platform || 'web',
+      createdBy: req.user.userId,
+      domainId: domainId,
+    });
     return res.status(201).json({ success: true, testCase });
   } catch (err) {
     return next(err);
@@ -19,7 +42,8 @@ async function createTestCase(req, res, next) {
 
 async function getAllTestCases(req, res, next) {
   try {
-    const testCases = await testCaseService.getAll();
+    const domainId = req.query.domainId ? parseInt(req.query.domainId, 10) : null;
+    const testCases = await testCaseService.getAll(req.user, domainId);
     return res.json({ success: true, testCases });
   } catch (err) {
     return next(err);

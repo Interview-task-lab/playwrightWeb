@@ -11,27 +11,41 @@ const { pool } = require('../config/database');
 class TestCaseRepository {
   /**
    * Inserts a new test case and returns the created record.
-   * @param {{ name: string, url: string, language: string, code: string, steps: object[] }} dto
+   * @param {{ name: string, url: string, platform: string, code: string, steps: object[], createdBy: number|null, domainId: number|null }} dto
    * @returns {Promise<object>}
    */
-  async create({ name, url, language, code, steps }) {
+  async create({ name, url, platform, code, steps, createdBy, domainId }) {
     const result = await pool.query(
-      `INSERT INTO test_cases (name, url, language, code, steps)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO test_cases (name, url, platform, code, steps, created_by, domain_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [name, url || '', language || 'javascript', code, JSON.stringify(steps || [])]
+      [name, url || '', platform || 'web', code, JSON.stringify(steps || []), createdBy, domainId]
     );
     return result.rows[0];
   }
 
   /**
-   * Returns all test cases ordered by creation date descending.
+   * Returns all test cases, optionally filtered by domainId, ordered by creation date descending.
+   * @param {number|null} domainId
    * @returns {Promise<object[]>}
    */
-  async findAll() {
-    const result = await pool.query(
-      'SELECT * FROM test_cases ORDER BY created_at DESC'
-    );
+  async findAll(domainId = null) {
+    let query = `
+      SELECT tc.*, d.name as domain_name, u.username as creator_username
+      FROM test_cases tc
+      LEFT JOIN domains d ON tc.domain_id = d.id
+      LEFT JOIN users u ON tc.created_by = u.id
+    `;
+    const params = [];
+
+    if (domainId !== null) {
+      query += ` WHERE tc.domain_id = $1`;
+      params.push(domainId);
+    }
+
+    query += ` ORDER BY tc.created_at DESC`;
+
+    const result = await pool.query(query, params);
     return result.rows;
   }
 
@@ -42,7 +56,11 @@ class TestCaseRepository {
    */
   async findById(id) {
     const result = await pool.query(
-      'SELECT * FROM test_cases WHERE id = $1',
+      `SELECT tc.*, d.name as domain_name, u.username as creator_username
+       FROM test_cases tc
+       LEFT JOIN domains d ON tc.domain_id = d.id
+       LEFT JOIN users u ON tc.created_by = u.id
+       WHERE tc.id = $1`,
       [id]
     );
     return result.rows[0] || null;

@@ -33,11 +33,10 @@ export class RecordingController {
 
   async start() {
     const url = this._page.selectedUrl;
-    const language = this._page.selectedLanguage;
 
     try {
       this._page.setStartBtnLoading('Starting…');
-      const data = await recordApi.start({ url, language });
+      const data = await recordApi.start({ url });
 
       if (!data.success) {
         this._toast.show(data.message, 'error');
