@@ -101,6 +101,68 @@ async function initDatabase() {
         ADD COLUMN IF NOT EXISTS domain_id INTEGER REFERENCES domains(id) ON DELETE SET NULL;
     `);
 
+    // 4. Create run_configurations table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS run_configurations (
+        id               SERIAL PRIMARY KEY,
+        name             VARCHAR(255) NOT NULL,
+        type             VARCHAR(20) NOT NULL,
+        domain_ids       INTEGER[] NOT NULL,
+        last_report_url  VARCHAR(512) DEFAULT NULL,
+        created_by       INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Migrate domain_id to domain_ids if existing
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name='run_configurations' AND column_name='domain_ids'
+        ) THEN
+          ALTER TABLE run_configurations ADD COLUMN domain_ids INTEGER[];
+        END IF;
+
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name='run_configurations' AND column_name='domain_id'
+        ) THEN
+          UPDATE run_configurations 
+          SET domain_ids = ARRAY[domain_id] 
+          WHERE domain_id IS NOT NULL AND domain_ids IS NULL;
+
+          UPDATE run_configurations SET domain_ids = '{}' WHERE domain_ids IS NULL;
+          ALTER TABLE run_configurations ALTER COLUMN domain_ids SET NOT NULL;
+
+          ALTER TABLE run_configurations DROP COLUMN domain_id;
+        END IF;
+      END $$;
+    `);
+
+    // Migrate to add last_report_url column if not existing
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name='run_configurations' AND column_name='last_report_url'
+        ) THEN
+          ALTER TABLE run_configurations ADD COLUMN last_report_url VARCHAR(512) DEFAULT NULL;
+        END IF;
+      END $$;
+    `);
+
+    // 5. Create run_configuration_test_cases table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS run_configuration_test_cases (
+        run_configuration_id INTEGER REFERENCES run_configurations(id) ON DELETE CASCADE,
+        test_case_id         INTEGER REFERENCES test_cases(id) ON DELETE CASCADE,
+        PRIMARY KEY (run_configuration_id, test_case_id)
+      );
+    `);
+
     console.log('✅ Database connected & schema initialization completed.');
   } catch (err) {
     console.error('⚠️  Could not connect to PostgreSQL or execute schema initialization.');

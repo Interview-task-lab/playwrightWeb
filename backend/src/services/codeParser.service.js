@@ -58,8 +58,14 @@ class CodeParserService {
     const safeName = testName.replace(/'/g, "\\'");
     let body = bodyLines.join('\n');
 
-    // Replace absolute URLs with relative '/' to use baseURL from config
-    body = body.replace(/goto\(['"]https?:\/\/[^'"]+['"]\)/g, "goto('/')");
+    // Replace absolute URLs with relative paths to use baseURL from config
+    body = body.replace(/goto\(['"]https?:\/\/([^'"]+?)['"]\)/g, (match, urlPath) => {
+      const slashIdx = urlPath.indexOf('/');
+      if (slashIdx === -1) {
+        return "goto('/')";
+      }
+      return `goto('${urlPath.slice(slashIdx)}')`;
+    });
 
     return `const { test, expect } = require('@playwright/test');\n\ntest('${safeName}', async ({ page }) => {\n${body}\n});\n`;
   }

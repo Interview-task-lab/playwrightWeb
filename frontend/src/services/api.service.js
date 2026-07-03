@@ -98,3 +98,19 @@ export const testCaseApi = {
 
   getRunStatus: () => request('/test-cases/run-status'),
 };
+
+// ─── Run Configurations ──────────────────────────────────────────────────────
+
+export const runConfigurationApi = {
+  getAll: () => request('/run-configurations'),
+  create: (payload) =>
+    request('/run-configurations', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  delete: (id) =>
+    request(`/run-configurations/${id}`, { method: 'DELETE' }),
+  run: (id) =>
+    request(`/run-configurations/${id}/run`, { method: 'POST' }),
+};
+
