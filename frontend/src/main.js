@@ -15,6 +15,7 @@ import { RecordingController } from './controllers/recording.controller.js';
 import { TestListController } from './controllers/testList.controller.js';
 import { RunnerController } from './controllers/runner.controller.js';
 import { DomainController } from './controllers/domain.controller.js';
+import { RunConfigurationController } from './controllers/runConfiguration.controller.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   // ─── Authentication Guard ───────────────────────────────────────────────
@@ -52,6 +53,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const recordingCtrl = new RecordingController(page, statusBadge, toast);
   const testListCtrl  = new TestListController(page, toast, modal, () => recordingCtrl.result);
   const runnerCtrl    = new RunnerController(page, toast);
+  const runConfigCtrl = new RunConfigurationController(page, toast, user);
 
   let activeDomainId = null;
 
@@ -80,6 +82,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   page.newRecordingBtn.addEventListener('click', () => recordingCtrl.resetForNewRecording());
   page.saveTestBtn.addEventListener('click',     () => testListCtrl.save());
   page.refreshTestsBtn.addEventListener('click', () => testListCtrl.load(activeDomainId));
+
+  // Navigation page switches
+  page.navStudioBtn.addEventListener('click', () => {
+    page.showStudio();
+  });
+
+  page.navTestRunsBtn.addEventListener('click', async () => {
+    page.showTestRuns();
+    await runConfigCtrl.load();
+  });
+
+  // Bind run configuration controller events
+  runConfigCtrl.bind();
 
   // Enter key on URL input triggers recording
   page.urlInput?.addEventListener('keydown', (e) => {

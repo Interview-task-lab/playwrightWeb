@@ -20,6 +20,7 @@ const configRoutes = require('./routes/config.routes');
 const recordRoutes = require('./routes/record.routes');
 const testCaseRoutes = require('./routes/testCase.routes');
 const runnerRoutes = require('./routes/runner.routes');
+const runConfigurationRoutes = require('./routes/runConfiguration.routes');
 
 const authenticate = require('./middleware/authMiddleware');
 const { authorizeRoles } = require('./middleware/authorizeMiddleware');
@@ -54,6 +55,7 @@ app.use('/api/config', authenticate, configRoutes);
 app.use('/api/record', authenticate, recordRoutes);
 app.use('/api/test-cases', authenticate, testCaseRoutes);
 app.use('/api/test-cases', authenticate, runnerRoutes);
+app.use('/api/run-configurations', authenticate, runConfigurationRoutes);
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => res.json({ status: 'ok' }));

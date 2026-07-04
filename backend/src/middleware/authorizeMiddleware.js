@@ -83,4 +83,104 @@ function authorizeTestCaseAccess(action) {
   };
 }
 
-module.exports = { authorizeRoles, authorizeTestCaseAccess };
+const runConfigRepository = require('../repositories/runConfiguration.repository');
+
+/**
+ * Enforces domain-level access control for run configurations.
+ * - Admin and QA can access all configurations.
+ * - Team members (kredi_takimi, hesap_takimi) can ONLY read/write/run/delete configs
+ *   within their own domain or sub-domains.
+ * @param {'read'|'write'|'run'|'delete'} action
+ * @returns {import('express').RequestHandler}
+ */
+function authorizeRunConfigAccess(action) {
+  return async (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const { role, domainId } = req.user;
+
+    // Admin and QA have full bypass
+    if (role === 'admin' || role === 'qa') {
+      return next();
+    }
+
+    const configId = req.params.id;
+
+    // If we have an existing config ID (run, delete, getById)
+    if (configId) {
+      try {
+        const config = await runConfigRepository.findById(parseInt(configId, 10));
+        if (!config) {
+          return res.status(404).json({ success: false, message: 'Run configuration not found.' });
+        }
+
+        // Verify config's domain: ALL target domains must be descendants or self of user's domain
+        let isAllowed = true;
+        for (const configDomainId of config.domain_ids) {
+          const match = await domainRepository.isDescendantOrSelf(domainId, configDomainId);
+          if (!match) {
+            isAllowed = false;
+            break;
+          }
+        }
+
+        if (!isAllowed) {
+          return res.status(403).json({
+            success: false,
+            message: `Forbidden: You do not have permission to ${action} configurations outside your domain scope.`,
+          });
+        }
+      } catch (err) {
+        return next(err);
+      }
+    }
+
+    // For write (POST creation), verify target domainId and testCaseIds
+    if (action === 'write' && req.method === 'POST') {
+      try {
+        const targetDomainIds = req.body.domainIds;
+        if (!targetDomainIds || !Array.isArray(targetDomainIds) || targetDomainIds.length === 0) {
+          return res.status(400).json({ success: false, message: 'Target domains are required.' });
+        }
+
+        // All target domains must be descendant or self of user's domain
+        for (const targetDomainId of targetDomainIds) {
+          const isDomainAllowed = await domainRepository.isDescendantOrSelf(domainId, targetDomainId);
+          if (!isDomainAllowed) {
+            return res.status(403).json({
+              success: false,
+              message: 'Forbidden: Cannot create configurations for domains outside your scope.',
+            });
+          }
+        }
+
+        // If custom type, verify all selected testCaseIds
+        if (req.body.type === 'custom' && req.body.testCaseIds) {
+          for (const tcId of req.body.testCaseIds) {
+            const testCase = await tcRepository.findById(tcId);
+            if (!testCase) {
+              return res.status(404).json({ success: false, message: `Test case with ID ${tcId} not found.` });
+            }
+
+            const isTcAllowed = await domainRepository.isDescendantOrSelf(domainId, testCase.domain_id);
+            if (!isTcAllowed) {
+              return res.status(403).json({
+                success: false,
+                message: `Forbidden: Test case "${testCase.name}" belongs to a domain outside your scope.`,
+              });
+            }
+          }
+        }
+      } catch (err) {
+        return next(err);
+      }
+    }
+
+    return next();
+  };
+}
+
+module.exports = { authorizeRoles, authorizeTestCaseAccess, authorizeRunConfigAccess };
+

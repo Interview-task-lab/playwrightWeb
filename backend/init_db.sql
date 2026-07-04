@@ -35,6 +35,27 @@ ALTER TABLE test_cases
   ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS domain_id INTEGER REFERENCES domains(id) ON DELETE SET NULL;
 
+-- Run Configurations tablosu
+CREATE TABLE IF NOT EXISTS run_configurations (
+  id               SERIAL PRIMARY KEY,
+  name             VARCHAR(255) NOT NULL,
+  type             VARCHAR(20) NOT NULL,
+  domain_ids       INTEGER[] NOT NULL,
+  last_report_url  VARCHAR(512) DEFAULT NULL,
+  is_serial        BOOLEAN DEFAULT TRUE,
+  created_by       INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Run Configuration Test Cases (Junction) tablosu
+CREATE TABLE IF NOT EXISTS run_configuration_test_cases (
+  run_configuration_id INTEGER REFERENCES run_configurations(id) ON DELETE CASCADE,
+  test_case_id         INTEGER REFERENCES test_cases(id) ON DELETE CASCADE,
+  sort_order           INTEGER DEFAULT 0,
+  PRIMARY KEY (run_configuration_id, test_case_id)
+);
+
+
 
 -- 2. Verilerin Seed Edilmesi (Domainler ve 4 Kullanıcı)
 -- NOT: Tüm kullanıcıların varsayılan şifresi "123456" olarak ayarlanmıştır.

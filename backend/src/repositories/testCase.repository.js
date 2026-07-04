@@ -50,6 +50,25 @@ class TestCaseRepository {
   }
 
   /**
+   * Returns all test cases belonging to any of the specified domain IDs.
+   * @param {number[]} domainIds
+   * @returns {Promise<object[]>}
+   */
+  async findAllInDomains(domainIds) {
+    if (!domainIds || domainIds.length === 0) return [];
+    const result = await pool.query(
+      `SELECT tc.*, d.name as domain_name, u.username as creator_username
+       FROM test_cases tc
+       LEFT JOIN domains d ON tc.domain_id = d.id
+       LEFT JOIN users u ON tc.created_by = u.id
+       WHERE tc.domain_id = ANY($1)
+       ORDER BY tc.created_at DESC`,
+      [domainIds]
+    );
+    return result.rows;
+  }
+
+  /**
    * Returns a single test case by ID, or null if not found.
    * @param {number} id
    * @returns {Promise<object|null>}
