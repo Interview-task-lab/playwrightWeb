@@ -12,12 +12,12 @@ class RunConfigurationRepository {
    * @param {{ name: string, type: 'custom'|'domain', domainId: number, createdBy: number|null }} dto
    * @returns {Promise<object>}
    */
-  async create({ name, type, domainIds, createdBy }) {
+  async create({ name, type, domainIds, isSerial = true, createdBy }) {
     const result = await pool.query(
-      `INSERT INTO run_configurations (name, type, domain_ids, created_by)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO run_configurations (name, type, domain_ids, is_serial, created_by)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [name, type, domainIds, createdBy]
+      [name, type, domainIds, isSerial, createdBy]
     );
     return result.rows[0];
   }
@@ -35,15 +35,15 @@ class RunConfigurationRepository {
     const valuePlaceholders = [];
     
     testCaseIds.forEach((tcId, idx) => {
-      values.push(configId, tcId);
-      const baseIdx = idx * 2;
-      valuePlaceholders.push(`($${baseIdx + 1}, $${baseIdx + 2})`);
+      values.push(configId, tcId, idx);
+      const baseIdx = idx * 3;
+      valuePlaceholders.push(`($${baseIdx + 1}, $${baseIdx + 2}, $${baseIdx + 3})`);
     });
 
     const query = `
-      INSERT INTO run_configuration_test_cases (run_configuration_id, test_case_id)
+      INSERT INTO run_configuration_test_cases (run_configuration_id, test_case_id, sort_order)
       VALUES ${valuePlaceholders.join(', ')}
-      ON CONFLICT DO NOTHING
+      ON CONFLICT (run_configuration_id, test_case_id) DO UPDATE SET sort_order = EXCLUDED.sort_order
     `;
 
     await pool.query(query, values);
@@ -100,12 +100,12 @@ class RunConfigurationRepository {
    */
   async findTestCasesByConfigId(configId) {
     const result = await pool.query(
-      `SELECT tc.*, d.name as domain_name
+      `SELECT tc.*, d.name as domain_name, rctc.sort_order
        FROM test_cases tc
        INNER JOIN run_configuration_test_cases rctc ON tc.id = rctc.test_case_id
        LEFT JOIN domains d ON tc.domain_id = d.id
        WHERE rctc.run_configuration_id = $1
-       ORDER BY tc.created_at DESC`,
+       ORDER BY rctc.sort_order ASC, tc.created_at DESC`,
       [configId]
     );
     return result.rows;

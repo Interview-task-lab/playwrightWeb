@@ -171,16 +171,19 @@ module.exports = defineConfig({
     }
 
     // Write all spec files
-    testCases.forEach((tc) => {
+    testCases.forEach((tc, index) => {
       const testCode = codeParser.convertToPlaywrightTest(tc.code, tc.name);
-      const tcFile = path.join(runDir, `test_${tc.id}.spec.js`);
+      const filePrefix = String(index + 1).padStart(4, '0');
+      const tcFile = path.join(runDir, `${filePrefix}_test_${tc.id}.spec.js`);
       fs.writeFileSync(tcFile, testCode, 'utf-8');
     });
 
+    const workersSetting = runConfig.is_serial !== false ? 1 : 'undefined';
     const reportDirEscaped = reportDir.replace(/\\/g, '/');
     const configFile = path.join(config.paths.root, `playwright_run_${userId}_${sessionUuid}.config.js`);
     const configContent = `const { defineConfig } = require('@playwright/test');
 module.exports = defineConfig({
+  workers: ${workersSetting},
   reporter: [['html', { outputFolder: '${reportDirEscaped}', open: 'never' }]],
   use: {
     headless: false,

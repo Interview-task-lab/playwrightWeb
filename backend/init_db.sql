@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS run_configurations (
   type             VARCHAR(20) NOT NULL,
   domain_ids       INTEGER[] NOT NULL,
   last_report_url  VARCHAR(512) DEFAULT NULL,
+  is_serial        BOOLEAN DEFAULT TRUE,
   created_by       INTEGER REFERENCES users(id) ON DELETE SET NULL,
   created_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -50,6 +51,7 @@ CREATE TABLE IF NOT EXISTS run_configurations (
 CREATE TABLE IF NOT EXISTS run_configuration_test_cases (
   run_configuration_id INTEGER REFERENCES run_configurations(id) ON DELETE CASCADE,
   test_case_id         INTEGER REFERENCES test_cases(id) ON DELETE CASCADE,
+  sort_order           INTEGER DEFAULT 0,
   PRIMARY KEY (run_configuration_id, test_case_id)
 );
 

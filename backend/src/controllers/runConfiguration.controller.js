@@ -11,7 +11,7 @@ const fs = require('fs');
 
 async function createConfig(req, res, next) {
   try {
-    const { name, type, domainIds, testCaseIds } = req.body;
+    const { name, type, domainIds, testCaseIds, isSerial } = req.body;
     const createdBy = req.user.userId;
 
     const config = await runConfigurationService.createConfig({
@@ -19,6 +19,7 @@ async function createConfig(req, res, next) {
       type,
       domainIds,
       testCaseIds,
+      isSerial,
       createdBy,
     });
 

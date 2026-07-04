@@ -72,6 +72,16 @@ export class RunConfigurationController {
 
     // Refresh configurations list
     this._page.refreshConfigsBtn?.addEventListener('click', () => this.load());
+
+    // Test case checklist toggle adds/removes to draggable order list
+    this._page.configTestCasesList?.addEventListener('change', (e) => {
+      if (e.target.name === 'configTestCase') {
+        this._handleTestCaseCheckboxChange(e.target);
+      }
+    });
+
+    // Initialize drag and drop
+    this._initDragAndDrop();
   }
 
   /**
@@ -138,12 +148,7 @@ export class RunConfigurationController {
   }
 
   _handleTypeChange() {
-    const type = this._page.configTypeSelect.value;
-    if (type === 'custom') {
-      this._page.configTestCasesWrapper.classList.remove('hidden');
-    } else {
-      this._page.configTestCasesWrapper.classList.add('hidden');
-    }
+    this._populateTestCasesCheckboxes();
   }
 
   /**
@@ -168,36 +173,30 @@ export class RunConfigurationController {
       const parentAllowed = isUserAllowed(parent.id);
       const allowedChildren = (parent.subDomains || []).filter(sub => isUserAllowed(sub.id));
 
-      if (parentAllowed) {
-        const childrenHtml = allowedChildren.map(child => `
-          <label class="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-900/60 border border-surface-800 hover:border-surface-700 cursor-pointer transition select-none">
-            <input type="checkbox" name="configDomain" value="${child.id}" data-parent-id="${parent.id}" class="rounded text-accent-500 focus:ring-accent-500 border-surface-700 bg-surface-950 w-4 h-4" />
-            <span class="text-xs text-white truncate" title="${child.name}">${child.name}</span>
-          </label>
-        `).join('');
-
-        const parentCheckboxHtml = `
-          <label class="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-900/40 border border-surface-800/80 hover:border-surface-700 cursor-pointer transition select-none mb-2 font-semibold">
-            <input type="checkbox" name="configDomain" value="${parent.id}" data-is-parent="true" data-id="${parent.id}" class="rounded text-accent-500 focus:ring-accent-500 border-surface-700 bg-surface-950 w-4 h-4" />
-            <span class="text-xs text-white truncate" title="${parent.name}">${parent.name}</span>
-          </label>
-        `;
-
-        html += `
-          <div class="domain-group border-b border-surface-800/40 pb-3 last:border-b-0 last:pb-0">
-            ${parentCheckboxHtml}
-            ${childrenHtml ? `<div class="pl-6 grid grid-cols-2 sm:grid-cols-3 gap-2">${childrenHtml}</div>` : ''}
-          </div>
-        `;
-      } else {
+      if (parentAllowed || allowedChildren.length > 0) {
+        let childrenHtml = '';
         if (allowedChildren.length > 0) {
-          const childrenHtml = allowedChildren.map(child => `
-            <label class="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-900/60 border border-surface-800 hover:border-surface-700 cursor-pointer transition select-none">
-              <input type="checkbox" name="configDomain" value="${child.id}" class="rounded text-accent-500 focus:ring-accent-500 border-surface-700 bg-surface-950 w-4 h-4" />
-              <span class="text-xs text-white truncate" title="${child.name}">${child.name}</span>
-            </label>
-          `).join('');
+          childrenHtml = allowedChildren
+            .map((child) => `
+              <label class="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-900/60 border border-surface-800 hover:border-surface-700 cursor-pointer transition select-none">
+                <input type="checkbox" name="configDomain" value="${child.id}" data-parent-id="${parent.id}" class="rounded text-accent-500 focus:ring-accent-500 border-surface-700 bg-surface-950 w-4 h-4" />
+                <span class="text-xs text-white">${child.name}</span>
+              </label>
+            `)
+            .join('');
+        }
 
+        if (parentAllowed) {
+          html += `
+            <div class="domain-group border-b border-surface-800/40 pb-3 last:border-b-0 last:pb-0">
+              <label class="flex items-center gap-2 mb-2 cursor-pointer select-none">
+                <input type="checkbox" name="configDomain" value="${parent.id}" data-is-parent="true" data-id="${parent.id}" class="rounded text-accent-500 focus:ring-accent-500 border-surface-700 bg-surface-950 w-4 h-4" />
+                <span class="text-sm font-bold text-white">${parent.name}</span>
+              </label>
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 pl-6">${childrenHtml}</div>
+            </div>
+          `;
+        } else {
           html += `
             <div class="domain-group border-b border-surface-800/40 pb-3 last:border-b-0 last:pb-0">
               <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">${childrenHtml}</div>
@@ -229,9 +228,12 @@ export class RunConfigurationController {
     const selectedDomainIds = checkedDomainBoxes.map(cb => parseInt(cb.value, 10));
 
     if (selectedDomainIds.length === 0) {
-      container.innerHTML = '<div class="col-span-full text-center text-xs text-surface-500">Öncelikle en az bir hedef domain seçin.</div>';
+      this._page.configTestCasesWrapper?.classList.add('hidden');
       return;
     }
+
+    // Show wrapper when domains are selected
+    this._page.configTestCasesWrapper?.classList.remove('hidden');
 
     // Filter test cases that belong to any of the selectedDomainIds hierarchies
     const filteredTests = this._allTestCases.filter((tc) => {
@@ -252,21 +254,158 @@ export class RunConfigurationController {
       return isDomainMatch && isUserMatch;
     });
 
+    if (this._page.configSelectedOrderList) {
+      this._page.configSelectedOrderList.innerHTML = '';
+      if (this._page.configSelectedOrderEmpty) {
+        this._page.configSelectedOrderList.appendChild(this._page.configSelectedOrderEmpty);
+        this._page.configSelectedOrderEmpty.classList.remove('hidden');
+      }
+    }
+
     if (filteredTests.length === 0) {
       container.innerHTML = '<div class="col-span-full text-center text-xs text-surface-500">Seçili domainler altında test senaryosu bulunamadı.</div>';
       return;
     }
 
+    const isDomainType = this._page.configTypeSelect?.value === 'domain';
+
     container.innerHTML = filteredTests
-      .map((tc) => `
-        <label class="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-900/60 border border-surface-800 hover:border-surface-700 cursor-pointer transition select-none">
-          <input type="checkbox" name="configTestCase" value="${tc.id}" class="rounded text-accent-500 focus:ring-accent-500 border-surface-700 bg-surface-950 w-4 h-4" />
-          <div class="flex flex-col min-w-0">
-            <span class="text-xs font-semibold text-white truncate">${tc.name}</span>
-            <span class="text-[10px] text-surface-400 truncate">${tc.domain_name || 'No Domain'}</span>
-          </div>
-        </label>`)
+      .map((tc) => {
+        const checkedAttribute = isDomainType ? 'checked disabled' : '';
+        return `
+          <label class="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-900/60 border border-surface-800 hover:border-surface-700 cursor-pointer transition select-none">
+            <input type="checkbox" name="configTestCase" value="${tc.id}" ${checkedAttribute} class="rounded text-accent-500 focus:ring-accent-500 border-surface-700 bg-surface-950 w-4 h-4" />
+            <div class="flex flex-col min-w-0">
+              <span class="text-xs font-semibold text-white truncate">${tc.name}</span>
+              <span class="text-[10px] text-surface-400 truncate">${tc.domain_name || 'No Domain'}</span>
+            </div>
+          </label>`;
+      })
       .join('');
+
+    // If it is domain type, automatically populate the sortable execution list with all tests
+    if (isDomainType) {
+      const orderList = this._page.configSelectedOrderList;
+      const emptyDiv = this._page.configSelectedOrderEmpty;
+      
+      filteredTests.forEach((testCase) => {
+        const item = document.createElement('div');
+        item.setAttribute('draggable', 'true');
+        item.setAttribute('data-id', testCase.id.toString());
+        item.className = 'flex items-center gap-3 p-3 bg-surface-900 border border-surface-800 rounded-xl cursor-grab active:cursor-grabbing hover:border-surface-700 transition select-none';
+        item.innerHTML = `
+          <div class="text-surface-500 shrink-0">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/>
+            </svg>
+          </div>
+          <div class="flex flex-col min-w-0">
+            <span class="text-xs font-semibold text-white truncate">${testCase.name}</span>
+            <span class="text-[10px] text-surface-400 truncate">${testCase.domain_name || 'No Domain'}</span>
+          </div>
+        `;
+        orderList.appendChild(item);
+      });
+      if (filteredTests.length > 0) {
+        emptyDiv?.classList.add('hidden');
+      }
+    }
+  }
+
+  /**
+   * Appends or removes test cases in the drag-and-drop sortable list.
+   * @param {HTMLInputElement} checkbox
+   */
+  _handleTestCaseCheckboxChange(checkbox) {
+    const tcId = parseInt(checkbox.value, 10);
+    const orderList = this._page.configSelectedOrderList;
+    const emptyDiv = this._page.configSelectedOrderEmpty;
+
+    if (checkbox.checked) {
+      const testCase = this._allTestCases.find(t => t.id === tcId);
+      if (!testCase) return;
+
+      const item = document.createElement('div');
+      item.setAttribute('draggable', 'true');
+      item.setAttribute('data-id', tcId.toString());
+      item.className = 'flex items-center gap-3 p-3 bg-surface-900 border border-surface-800 rounded-xl cursor-grab active:cursor-grabbing hover:border-surface-700 transition select-none';
+      item.innerHTML = `
+        <div class="text-surface-500 shrink-0">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/>
+          </svg>
+        </div>
+        <div class="flex flex-col min-w-0">
+          <span class="text-xs font-semibold text-white truncate">${testCase.name}</span>
+          <span class="text-[10px] text-surface-400 truncate">${testCase.domain_name || 'No Domain'}</span>
+        </div>
+      `;
+      orderList.appendChild(item);
+      emptyDiv?.classList.add('hidden');
+    } else {
+      const existingItem = orderList.querySelector(`[data-id="${tcId}"]`);
+      if (existingItem) {
+        existingItem.remove();
+      }
+      
+      const remains = orderList.querySelectorAll('[draggable="true"]');
+      if (remains.length === 0) {
+        emptyDiv?.classList.remove('hidden');
+      }
+    }
+  }
+
+  /**
+   * Initializes drag and drop sorting for test cases.
+   */
+  _initDragAndDrop() {
+    const list = this._page.configSelectedOrderList;
+    if (!list) return;
+
+    let draggedItem = null;
+
+    list.addEventListener('dragstart', (e) => {
+      draggedItem = e.target.closest('[draggable="true"]');
+      if (draggedItem) {
+        draggedItem.classList.add('opacity-40');
+      }
+    });
+
+    list.addEventListener('dragend', (e) => {
+      if (draggedItem) {
+        draggedItem.classList.remove('opacity-40');
+        draggedItem = null;
+      }
+    });
+
+    list.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      const afterElement = this._getDragAfterElement(list, e.clientY);
+      const draggable = draggedItem;
+      if (!draggable) return;
+      if (afterElement == null) {
+        list.appendChild(draggable);
+      } else {
+        list.insertBefore(draggable, afterElement);
+      }
+    });
+  }
+
+  /**
+   * Determines which element the cursor is positioned directly below during a drag event.
+   */
+  _getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('[draggable="true"]:not(.opacity-40)')];
+
+    return draggableElements.reduce((closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) {
+        return { offset: offset, element: child };
+      } else {
+        return closest;
+      }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
   }
 
   /**
@@ -289,15 +428,21 @@ export class RunConfigurationController {
       return;
     }
 
-    const payload = { name, type, domainIds };
+    const isSerial = this._page.configRunModeSelect?.value === 'true';
+    const payload = { name, type, domainIds, isSerial };
+
+    const orderItems = Array.from(this._page.configSelectedOrderList.querySelectorAll('[draggable="true"]'));
 
     if (type === 'custom') {
-      const checkedBoxes = Array.from(this._page.configTestCasesList.querySelectorAll('input[name="configTestCase"]:checked'));
-      if (checkedBoxes.length === 0) {
+      if (orderItems.length === 0) {
         this._toast.show('Lütfen en az bir test senaryosu seçin.', 'error');
         return;
       }
-      payload.testCaseIds = checkedBoxes.map(cb => parseInt(cb.value, 10));
+      payload.testCaseIds = orderItems.map(item => parseInt(item.getAttribute('data-id'), 10));
+    } else {
+      if (orderItems.length > 0) {
+        payload.testCaseIds = orderItems.map(item => parseInt(item.getAttribute('data-id'), 10));
+      }
     }
 
     try {
@@ -339,6 +484,10 @@ export class RunConfigurationController {
           ? `<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Domain Bazlı</span>`
           : `<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-accent-500/10 text-accent-400 border border-accent-500/20">Özel Seçim</span>`;
 
+        const runModeBadge = config.is_serial !== false
+          ? `<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">Seri</span>`
+          : `<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20">Paralel</span>`;
+
         const reportBtnHtml = config.last_report_url
           ? `<a id="reportConfigBtn-${config.id}" href="http://localhost:3000${config.last_report_url}" target="_blank" class="btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5 bg-accent-500/10 text-accent-400 border border-accent-500/20 hover:bg-accent-500/20">
                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -355,6 +504,7 @@ export class RunConfigurationController {
                 <h4 class="font-bold text-white text-sm truncate" title="${config.name}">${config.name}</h4>
                 <div class="flex gap-1.5 shrink-0">
                   ${typeBadge}
+                  ${runModeBadge}
                   <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-surface-800 text-surface-300 border border-surface-700/50" title="${config.domain_names}">${config.domain_names}</span>
                 </div>
               </div>

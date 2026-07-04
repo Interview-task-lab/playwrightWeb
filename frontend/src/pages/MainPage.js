@@ -39,10 +39,13 @@ export class MainPage {
     this.createConfigSection      = document.getElementById('createConfigSection');
     this.configNameInput          = document.getElementById('configNameInput');
     this.configTypeSelect          = document.getElementById('configTypeSelect');
+    this.configRunModeSelect      = document.getElementById('configRunModeSelect');
     this.configDomainSelectWrapper = document.getElementById('configDomainSelectWrapper');
     this.configDomainsList        = document.getElementById('configDomainsList');
     this.configTestCasesWrapper   = document.getElementById('configTestCasesWrapper');
     this.configTestCasesList      = document.getElementById('configTestCasesList');
+    this.configSelectedOrderList  = document.getElementById('configSelectedOrderList');
+    this.configSelectedOrderEmpty = document.getElementById('configSelectedOrderEmpty');
     this.cancelCreateConfigBtn    = document.getElementById('cancelCreateConfigBtn');
     this.saveConfigBtn            = document.getElementById('saveConfigBtn');
 

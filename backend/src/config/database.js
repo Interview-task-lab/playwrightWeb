@@ -109,6 +109,7 @@ async function initDatabase() {
         type             VARCHAR(20) NOT NULL,
         domain_ids       INTEGER[] NOT NULL,
         last_report_url  VARCHAR(512) DEFAULT NULL,
+        is_serial        BOOLEAN DEFAULT TRUE,
         created_by       INTEGER REFERENCES users(id) ON DELETE SET NULL,
         created_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
@@ -154,13 +155,40 @@ async function initDatabase() {
       END $$;
     `);
 
+    // Migrate to add is_serial column if not existing
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name='run_configurations' AND column_name='is_serial'
+        ) THEN
+          ALTER TABLE run_configurations ADD COLUMN is_serial BOOLEAN DEFAULT TRUE;
+        END IF;
+      END $$;
+    `);
+
     // 5. Create run_configuration_test_cases table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS run_configuration_test_cases (
         run_configuration_id INTEGER REFERENCES run_configurations(id) ON DELETE CASCADE,
         test_case_id         INTEGER REFERENCES test_cases(id) ON DELETE CASCADE,
+        sort_order           INTEGER DEFAULT 0,
         PRIMARY KEY (run_configuration_id, test_case_id)
       );
+    `);
+
+    // Migrate to add sort_order column if not existing
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name='run_configuration_test_cases' AND column_name='sort_order'
+        ) THEN
+          ALTER TABLE run_configuration_test_cases ADD COLUMN sort_order INTEGER DEFAULT 0;
+        END IF;
+      END $$;
     `);
 
     console.log('✅ Database connected & schema initialization completed.');

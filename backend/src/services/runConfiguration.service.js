@@ -17,7 +17,7 @@ class RunConfigurationService {
    * @param {{ name: string, type: 'custom'|'domain', domainId: number, testCaseIds?: number[], createdBy: number|null }} dto
    * @returns {Promise<object>}
    */
-  async createConfig({ name, type, domainIds, testCaseIds, createdBy }) {
+  async createConfig({ name, type, domainIds, testCaseIds, isSerial, createdBy }) {
     if (!name || typeof name !== 'string' || name.trim() === '') {
       throw new Error('Configuration name is required.');
     }
@@ -68,10 +68,10 @@ class RunConfigurationService {
     }
 
     // Create the run configuration
-    const config = await runConfigurationRepository.create({ name: name.trim(), type, domainIds, createdBy });
+    const config = await runConfigurationRepository.create({ name: name.trim(), type, domainIds, isSerial, createdBy });
 
-    // Link test cases if type is custom
-    if (type === 'custom' && testCaseIds && testCaseIds.length > 0) {
+    // Link test cases if testCaseIds are provided (both custom selection and domain sorted order)
+    if (testCaseIds && testCaseIds.length > 0) {
       await runConfigurationRepository.addTestCases(config.id, testCaseIds);
     }
 
@@ -125,7 +125,31 @@ class RunConfigurationService {
         const descendantIds = await domainRepository.getDescendantOrSelfIds(dId);
         descendantIds.forEach(id => allDescendantIds.add(id));
       }
-      return await testCaseRepository.findAllInDomains(Array.from(allDescendantIds));
+      const allTestsInDomains = await testCaseRepository.findAllInDomains(Array.from(allDescendantIds));
+      
+      // Get the saved sort orders for this config
+      const savedSortedTestCases = await runConfigurationRepository.findTestCasesByConfigId(configId);
+      const savedOrderMap = new Map();
+      savedSortedTestCases.forEach((tc) => {
+        savedOrderMap.set(tc.id, tc.sort_order);
+      });
+
+      // Sort the tests:
+      // - Tests with saved sort_order come first, ordered by sort_order
+      // - New tests come after, ordered by created_at DESC
+      allTestsInDomains.sort((a, b) => {
+        const hasA = savedOrderMap.has(a.id);
+        const hasB = savedOrderMap.has(b.id);
+        if (hasA && hasB) {
+          return savedOrderMap.get(a.id) - savedOrderMap.get(b.id);
+        }
+        if (hasA) return -1;
+        if (hasB) return 1;
+        
+        return new Date(b.created_at) - new Date(a.created_at);
+      });
+
+      return allTestsInDomains;
     } else {
       // Custom test cases
       return await runConfigurationRepository.findTestCasesByConfigId(configId);
