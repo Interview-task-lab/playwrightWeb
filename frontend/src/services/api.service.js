@@ -11,7 +11,7 @@
 
 import { authService } from './auth.service.js';
 
-const API_BASE = 'http://localhost:3000/api';
+const API_BASE = 'http://localhost:3001/api';
 
 /**
  * Generic fetch wrapper with JSON parsing and error normalization.

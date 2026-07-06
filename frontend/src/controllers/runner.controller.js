@@ -83,7 +83,7 @@ export class RunnerController {
         this._page.resetRunBtn(testId);
 
         if (data.reportUrl) {
-          const reportUrl = `http://localhost:3000${data.reportUrl}`;
+          const reportUrl = `http://localhost:3001${data.reportUrl}`;
           this._toast.show('Test finished! Opening report…', 'success');
           if (this._reportWindow && !this._reportWindow.closed) {
             this._reportWindow.location.href = reportUrl;

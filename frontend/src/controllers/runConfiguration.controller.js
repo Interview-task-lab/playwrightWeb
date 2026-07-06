@@ -489,7 +489,7 @@ export class RunConfigurationController {
           : `<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20">Paralel</span>`;
 
         const reportBtnHtml = config.last_report_url
-          ? `<a id="reportConfigBtn-${config.id}" href="http://localhost:3000${config.last_report_url}" target="_blank" class="btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5 bg-accent-500/10 text-accent-400 border border-accent-500/20 hover:bg-accent-500/20">
+          ? `<a id="reportConfigBtn-${config.id}" href="http://localhost:3001${config.last_report_url}" target="_blank" class="btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5 bg-accent-500/10 text-accent-400 border border-accent-500/20 hover:bg-accent-500/20">
                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293 l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                </svg>
@@ -592,7 +592,7 @@ export class RunConfigurationController {
         if (!listDiv.classList.contains('hidden') && listDiv.textContent.trim() === 'Yükleniyor...') {
           try {
             // Lazy load test cases for this custom config
-            const response = await fetch(`http://localhost:3000/api/run-configurations/${id}`);
+            const response = await fetch(`http://localhost:3001/api/run-configurations/${id}`);
             // Wait, we need an endpoint, or we can query our repository.
             // Oh, we defined `GET /api/run-configurations/:id` or similar? Let's check.
             // We defined `getConfigsForUser` and `/api/run-configurations` GET.
@@ -609,7 +609,7 @@ export class RunConfigurationController {
             // So a separate API endpoint to fetch test cases of a config is extremely clean!
             // Let's add that API route and controller method. I will do that in the next step.
             // For now, let's fetch from `/api/run-configurations/${id}/tests`.
-            const res = await fetch(`http://localhost:3000/api/run-configurations/${id}/tests`, {
+            const res = await fetch(`http://localhost:3001/api/run-configurations/${id}/tests`, {
               headers: {
                 'Authorization': `Bearer ${authService.getToken()}`
               }
@@ -679,7 +679,7 @@ export class RunConfigurationController {
 
     this._pollInterval = setInterval(async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/test-cases/run-status', {
+        const response = await fetch('http://localhost:3001/api/test-cases/run-status', {
           headers: {
             'Authorization': `Bearer ${authService.getToken()}`
           }
@@ -707,7 +707,7 @@ export class RunConfigurationController {
             }
 
             if (status.reportUrl) {
-              this._page.addConfigReportBtn(configId, `http://localhost:3000${status.reportUrl}`);
+              this._page.addConfigReportBtn(configId, `http://localhost:3001${status.reportUrl}`);
             }
           }
         }
@@ -729,7 +729,7 @@ export class RunConfigurationController {
    */
   async _checkActiveRunnerStatus() {
     try {
-      const response = await fetch('http://localhost:3000/api/test-cases/run-status', {
+      const response = await fetch('http://localhost:3001/api/test-cases/run-status', {
         headers: {
           'Authorization': `Bearer ${authService.getToken()}`
         }

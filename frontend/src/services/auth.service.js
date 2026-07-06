@@ -4,7 +4,7 @@
  * Handles JWT storage, authentication checks, and user session details.
  */
 
-const API_BASE = 'http://localhost:3000/api';
+const API_BASE = 'http://localhost:3001/api';
 
 class AuthService {
   /**

@@ -4,8 +4,8 @@
   "description": "Playwright Codegen Studio — Frontend UI",
   "type": "module",
   "scripts": {
-    "dev": "npx serve . -p 8080 --cors",
-    "start": "npx serve . -p 8080 --cors"
+    "dev": "npx serve . -p 8081 --cors",
+    "start": "npx serve . -p 8081 --cors"
   },
   "devDependencies": {
     "serve": "^14.2.3"
