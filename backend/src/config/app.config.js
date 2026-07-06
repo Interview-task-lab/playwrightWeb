@@ -8,11 +8,11 @@ const path = require('path');
 
 const config = {
   server: {
-    port: parseInt(process.env.PORT, 10) || 3000,
+    port: parseInt(process.env.PORT, 10) || 3001,
     /** Allowed frontend origins (CORS). Extend for production. */
     corsOrigins: process.env.CORS_ORIGINS
       ? process.env.CORS_ORIGINS.split(',')
-      : ['http://localhost:8080', 'http://127.0.0.1:8080'],
+      : ['http://localhost:8081', 'http://127.0.0.1:8081'],
   },
 
   database: {
